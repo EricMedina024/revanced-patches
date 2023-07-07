@@ -23,26 +23,19 @@ class ChangeOAuthRedirectUriPatch : AbstractChangeOAuthRedirectUriPatch(
     listOf(RedirectUriFingerprint)
 ) {
     override fun List<MethodFingerprintResult>.patch(context: BytecodeContext): PatchResult {
-        /**
-         * Replaces a one register instruction with a const-string instruction
-         * at the index returned by [getReplacementIndex].
-         *
-         * @param string The string to replace the instruction with.
-         * @param getReplacementIndex A function that returns the index of the instruction to replace
-         * using the [StringMatch] list from the [MethodFingerprintResult].
-         */
-        fun MethodFingerprintResult.replaceWith(
-            string: String,
-            getReplacementIndex: List<StringMatch>.() -> Int,
-        ) = mutableMethod.apply {
-            val replacementIndex = scanResult.stringsScanResult!!.matches.getReplacementIndex()
-            val clientIdRegister = getInstruction<OneRegisterInstruction>(replacementIndex).registerA
+        forEach { methodFingerprint ->
+            methodFingerprint.scanResult.stringsScanResult!!.matches.forEach { clientIdInstruction ->
+                methodFingerprint.mutableMethod.apply {
+                    val clientIdIndex = clientIdInstruction.index
+                    val clientIdRegister = getInstruction<OneRegisterInstruction>(clientIdIndex).registerA
 
-            replaceInstruction(replacementIndex, "const-string v$clientIdRegister, \"$string\"")
+                    methodFingerprint.mutableMethod.replaceInstruction(
+                        clientIdIndex,
+                        "const-string v$clientIdRegister, \"$redirectUri\""
+                    )
+                }
+            }
         }
-
-        // Patch OAuth authorization.
-        forEach { it.replaceWith(redirectUri!!) { first().index + 4 } }
 
         return PatchResultSuccess()
     }
